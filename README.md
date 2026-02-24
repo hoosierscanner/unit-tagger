@@ -123,4 +123,5 @@ Standard trunk-recorder unit tags format — one unit per line:
 924004,Engine 2
 ```
 
-The file is read on every request and written atomically on save, so trunk-recorder picks up new tags on its next reload cycle without a restart.
+Trunk Recorder requires a restart to attach these new entries. If you are over riding the OTA aliases make sure you have the flag set to check the units file first. 
+
