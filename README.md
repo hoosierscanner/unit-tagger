@@ -65,18 +65,46 @@ SYSTEM_CSV_MAP = {
 }
 ```
 
-`SYSTEM_CSV_MAP` maps tr-engine `system_id` values to the `unitTagsFile` CSV referenced in your trunk-recorder `config.json`.
+### Mapping systems to CSV files
 
-### trunk-recorder config requirements
+`SYSTEM_CSV_MAP` connects tr-engine's `system_id` to the `unitTagsFile` CSV defined in your trunk-recorder `config.json`. You need both sides to agree on the same file.
 
-Each system in `config.json` needs:
+**Step 1 — find your system_id in tr-engine:**
 
-```json
-"unitTagsFile": "/app/yourfile.csv",
-"unitTagsMode": "user"
+```bash
+curl -s http://localhost:8080/api/v1/systems | jq '.[] | {id, short_name}'
 ```
 
-`unitTagsMode: "user"` tells trunk-recorder to use the CSV as the authoritative source rather than overwriting it with OTA data.
+Example output:
+```json
+{ "id": 1, "short_name": "pscsite4" }
+{ "id": 3, "short_name": "ipscsite2" }
+```
+
+**Step 2 — match each system to a CSV in trunk-recorder `config.json`:**
+
+```json
+{
+  "shortName": "pscsite4",
+  "unitTagsFile": "/app/pscunits.csv",
+  "unitTagsMode": "user"
+}
+```
+
+**Step 3 — add the mapping to `SYSTEM_CSV_MAP` in `server.py`:**
+
+```python
+CSV_DIR = Path("/path/to/trunk-recorder/configs")  # directory containing the CSVs
+
+SYSTEM_CSV_MAP = {
+    1: "pscunits.csv",   # tr-engine system_id 1 = pscsite4
+    3: "ipscunits.csv",  # tr-engine system_id 3 = ipscsite2
+}
+```
+
+The key is the tr-engine `system_id` integer. The value is the filename (not full path) of the CSV inside `CSV_DIR`. Multiple `system_id` values can share the same CSV file — useful when two systems (e.g. multiSite P25 sites) share the same unit population.
+
+`unitTagsMode: "user"` in trunk-recorder tells it to treat the CSV as authoritative and not overwrite it with OTA unit data.
 
 ### Running
 
