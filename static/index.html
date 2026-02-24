@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unit Tagger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0d1117;
+    --surface:  #161b22;
+    --border:   #21262d;
+    --accent:   #00e5a0;
+    --accent2:  #00b8d9;
+    --warn:     #f0a500;
+    --danger:   #f85149;
+    --text:     #e6edf3;
+    --muted:    #7d8590;
+    --mono:     'Share Tech Mono', monospace;
+    --sans:     'Barlow', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr;
+  }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--surface);
+  }
+  header .logo {
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    color: var(--accent);
+    letter-spacing: 2px;
+  }
+  header .logo span { color: var(--muted); }
+  .badge {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    letter-spacing: 1px;
+  }
+  .badge.psc  { color: var(--accent);  border-color: var(--accent); }
+  .badge.ipsc { color: var(--accent2); border-color: var(--accent2); }
+
+  /* ── Layout ── */
+  .app {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    height: calc(100vh - 53px);
+    overflow: hidden;
+  }
+
+  /* ── Call List ── */
+  .call-list-panel {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .refresh-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    padding: 4px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 1px;
+  }
+  .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .refresh-btn.spinning { animation: spin 1s linear infinite; }
+
+  .filter-row {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .filter-row select, .filter-row input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 0.8rem;
+    padding: 6px 10px;
+    border-radius: 4px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .filter-row select:focus, .filter-row input:focus { border-color: var(--accent); }
+  .filter-row select { flex: 1; }
+  .filter-row input { flex: 1.2; }
+
+  .call-list {
+    overflow-y: auto;
+    flex: 1;
+  }
+  .call-list::-webkit-scrollbar { width: 4px; }
+  .call-list::-webkit-scrollbar-track { background: transparent; }
+  .call-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .call-item {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px;
+    align-items: start;
+  }
+  .call-item:hover { background: rgba(255,255,255,0.03); }
+  .call-item.active { background: rgba(0, 229, 160, 0.07); border-left: 2px solid var(--accent); }
+
+  .call-tg {
+    font-weight: 600;
+    font-size: 0.88rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .call-meta {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    grid-column: 1/-1;
+  }
+  .call-sys {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    text-align: right;
+  }
+
+  .load-more {
+    padding: 12px;
+    text-align: center;
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+  }
+  .load-more button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    padding: 6px 18px;
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.15s;
+  }
+  .load-more button:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* ── Detail Panel ── */
+  .detail-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--muted);
+  }
+  .empty-state .icon {
+    font-size: 3rem;
+    opacity: 0.3;
+  }
+  .empty-state p { font-family: var(--mono); font-size: 0.8rem; letter-spacing: 1px; }
+
+  .detail-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .detail-content::-webkit-scrollbar { width: 4px; }
+  .detail-content::-webkit-scrollbar-thumb { background: var(--border); }
+
+  /* Call info block */
+  .call-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .info-cell {
+    background: var(--surface);
+    padding: 10px 14px;
+  }
+  .info-label {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .info-value {
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+  .info-value.mono { font-family: var(--mono); }
+
+  /* Audio player */
+  .audio-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+  }
+  .section-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  audio {
+    width: 100%;
+    height: 36px;
+    accent-color: var(--accent);
+    filter: invert(0);
+  }
+  audio::-webkit-media-controls-panel { background: var(--bg); }
+
+  /* Units section */
+  .units-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .unit-row {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: start;
+    transition: border-color 0.15s;
+  }
+  .unit-row:focus-within { border-color: var(--accent); }
+
+  .unit-id-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .unit-id {
+    font-family: var(--mono);
+    font-size: 1rem;
+    color: var(--accent);
+  }
+  .unit-current-alias {
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  .unit-csv-badge {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    padding: 2px 7px;
+    border-radius: 2px;
+    margin-left: auto;
+  }
+
+  .alias-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .alias-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 0.88rem;
+    padding: 8px 12px;
+    border-radius: 4px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .alias-input:focus { border-color: var(--accent); }
+  .alias-input::placeholder { color: var(--muted); }
+
+  .save-btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: opacity 0.15s, transform 0.1s;
+    white-space: nowrap;
+  }
+  .save-btn:hover { opacity: 0.85; }
+  .save-btn:active { transform: scale(0.97); }
+  .save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .save-btn.ipsc { background: var(--accent2); }
+
+  .unit-status {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    padding: 4px 0 0;
+    grid-column: 1/-1;
+    min-height: 1.2em;
+  }
+  .unit-status.ok     { color: var(--accent); }
+  .unit-status.warn   { color: var(--warn); }
+  .unit-status.err    { color: var(--danger); }
+
+  /* Conflict modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--warn);
+    border-radius: 8px;
+    padding: 28px 32px;
+    max-width: 420px;
+    width: 90%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .modal-title {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--warn);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .modal-body { font-size: 0.88rem; line-height: 1.6; color: var(--text); }
+  .modal-body code {
+    font-family: var(--mono);
+    background: var(--bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: var(--warn);
+  }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-cancel {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.15s;
+  }
+  .btn-cancel:hover { border-color: var(--muted); color: var(--text); }
+  .btn-overwrite {
+    background: var(--warn);
+    border: none;
+    color: #000;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: opacity 0.15s;
+  }
+  .btn-overwrite:hover { opacity: 0.85; }
+
+  /* Skeleton loader */
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface) 25%, var(--border) 50%, var(--surface) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 3px;
+    height: 14px;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  .no-calls { padding: 32px 16px; text-align: center; color: var(--muted); font-family: var(--mono); font-size: 0.75rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">UNIT<span>//</span>TAGGER</div>
+  <span class="badge psc">PSC</span>
+  <span class="badge ipsc">IPSC</span>
+</header>
+
+<div class="app">
+  <!-- ── Call List ── -->
+  <div class="call-list-panel">
+    <div class="panel-header">
+      <span class="panel-title">Recent Calls</span>
+      <button class="refresh-btn" id="refreshBtn" onclick="loadCalls(true)">↻ REFRESH</button>
+    </div>
+    <div class="filter-row">
+      <select id="sysFilter" onchange="loadCalls(true)">
+        <option value="">All Systems</option>
+        <option value="1">pscsite4</option>
+        <option value="3">ipsc (pend/and)</option>
+      </select>
+      <input id="tgFilter" type="text" placeholder="Filter talkgroup…" oninput="debounceFilter()">
+    </div>
+    <div class="call-list" id="callList"></div>
+    <div class="load-more" id="loadMoreArea" style="display:none">
+      <button onclick="loadMore()">LOAD MORE</button>
+    </div>
+  </div>
+
+  <!-- ── Detail Panel ── -->
+  <div class="detail-panel">
+    <div class="empty-state" id="emptyState">
+      <div class="icon">📻</div>
+      <p>SELECT A CALL TO BEGIN</p>
+    </div>
+    <div class="detail-content" id="detailContent" style="display:none"></div>
+  </div>
+</div>
+
+<!-- Conflict Modal -->
+<div class="modal-overlay hidden" id="conflictModal">
+  <div class="modal">
+    <div class="modal-title">⚠ Duplicate Unit ID</div>
+    <div class="modal-body" id="conflictBody"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="dismissConflict()">CANCEL</button>
+      <button class="btn-overwrite" onclick="confirmOverwrite()">OVERWRITE</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const PAGE_SIZE = 150;
+let offset = 0;
+let totalCalls = 0;
+let allCalls = [];
+let selectedCallId = null;
+let conflictPending = null; // { unitId, alias, btn, statusEl }
+let filterTimer = null;
+
+// System → CSV + color info
+const SYS_INFO = {
+  1: { csv: 'pscunits.csv',  cls: 'psc'  },
+  4: { csv: 'pscunits.csv',  cls: 'psc'  },
+  2: { csv: 'ipscunits.csv', cls: 'ipsc' },
+  3: { csv: 'ipscunits.csv', cls: 'ipsc' },
+  5: { csv: 'ipscunits.csv', cls: 'ipsc' },
+};
+
+// ── Call List ─────────────────────────────────────────────────────────────
+async function loadCalls(reset = false) {
+  if (reset) { offset = 0; allCalls = []; }
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+
+  const sysId = document.getElementById('sysFilter').value;
+  const params = new URLSearchParams({ limit: PAGE_SIZE, offset });
+  if (sysId) params.set('system_id', sysId);
+
+  try {
+    const r = await fetch(`/api/calls?${params}`);
+    const data = await r.json();
+    const calls = data.calls || [];
+    totalCalls = data.total || 0;
+    allCalls = reset ? calls : [...allCalls, ...calls];
+    offset = allCalls.length;
+    renderCallList();
+  } catch(e) {
+    document.getElementById('callList').innerHTML =
+      '<div class="no-calls">⚠ Could not reach tr-engine</div>';
+  } finally {
+    btn.classList.remove('spinning');
+  }
+}
+
+function debounceFilter() {
+  clearTimeout(filterTimer);
+  filterTimer = setTimeout(() => renderCallList(), 200);
+}
+
+function renderCallList() {
+  const tgQ = document.getElementById('tgFilter').value.toLowerCase();
+  const filtered = allCalls.filter(c => {
+    if (c.encrypted) return false;
+    if (c.call_state === 'MONITORING') return false;
+    if (!tgQ) return true;
+    return (c.tg_alpha_tag || c.tg_tag || '').toLowerCase().includes(tgQ) ||
+           String(c.tgid || '').includes(tgQ);
+  });
+
+  const el = document.getElementById('callList');
+  if (!filtered.length) {
+    el.innerHTML = '<div class="no-calls">No calls found</div>';
+    document.getElementById('loadMoreArea').style.display = 'none';
+    return;
+  }
+
+  el.innerHTML = filtered.map(c => {
+    const sysInfo = SYS_INFO[c.system_id] || {};
+    const cls = sysInfo.cls || 'psc';
+    const csv = sysInfo.csv || '?';
+    const dt = new Date(c.start_time);
+    const ts = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const active = c.call_id === selectedCallId ? 'active' : '';
+    const tgLabel = c.tg_alpha_tag || c.tg_tag || `TG ${c.tgid}`;
+    return `<div class="call-item ${active}" onclick="loadCall(${c.call_id})">
+      <div class="call-tg">${esc(tgLabel)}</div>
+      <div class="call-sys badge ${cls}">${esc(c.site_short_name || csv.replace('units.csv',''))}</div>
+      <div class="call-meta">${ts} · ${esc(c.tg_tag || '')} · ID ${c.call_id}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('loadMoreArea').style.display =
+    allCalls.length < totalCalls ? 'block' : 'none';
+}
+
+async function loadMore() {
+  await loadCalls(false);
+}
+
+// ── Call Detail ───────────────────────────────────────────────────────────
+async function loadCall(callId) {
+  selectedCallId = callId;
+  renderCallList(); // re-highlight
+
+  document.getElementById('emptyState').style.display = 'none';
+  const detail = document.getElementById('detailContent');
+  detail.style.display = 'flex';
+  detail.innerHTML = `<div class="skeleton" style="height:80px;width:100%"></div>`;
+
+  const [callRes, unitsRes] = await Promise.all([
+    fetch(`/api/calls/${callId}`).then(r => r.json()),
+    fetch(`/api/calls/${callId}/units`).then(r => r.json()).catch(() => ({ units: [] })),
+  ]);
+
+  const call = callRes;
+  const units = unitsRes.units || [];
+
+  const sysInfo = SYS_INFO[call.system_id] || { csv: 'unknown.csv', cls: 'psc' };
+  const dt = new Date(call.start_time);
+  const tgLabel = call.tg_alpha_tag || call.tg_tag || `TG ${call.tgid}`;
+
+  detail.innerHTML = `
+    <!-- Call Info -->
+    <div class="call-info-grid">
+      <div class="info-cell">
+        <div class="info-label">Call ID</div>
+        <div class="info-value mono">${call.call_id}</div>
+      </div>
+      <div class="info-cell">
+        <div class="info-label">System</div>
+        <div class="info-value">${esc(call.system_name || call.system_id)}</div>
+      </div>
+      <div class="info-cell">
+        <div class="info-label">Talkgroup</div>
+        <div class="info-value">${esc(tgLabel)}</div>
+      </div>
+      <div class="info-cell">
+        <div class="info-label">Time</div>
+        <div class="info-value mono">${dt.toLocaleString()}</div>
+      </div>
+      <div class="info-cell">
+        <div class="info-label">CSV Target</div>
+        <div class="info-value mono badge ${sysInfo.cls}" style="display:inline-block;margin-top:2px">${sysInfo.csv}</div>
+      </div>
+      <div class="info-cell">
+        <div class="info-label">Duration</div>
+        <div class="info-value mono">${call.duration ? call.duration.toFixed(1) + 's' : '—'}</div>
+      </div>
+    </div>
+
+    <!-- Audio -->
+    ${call.audio_url ? `
+    <div class="audio-section">
+      <div class="section-label">Audio</div>
+      <audio controls preload="metadata" src="/api/calls/${callId}/audio"></audio>
+    </div>` : ''}
+
+    <!-- Units -->
+    <div class="units-section">
+      <div class="section-label">Units on call — ${units.length} unit(s)</div>
+      ${units.length === 0
+        ? '<div style="color:var(--muted);font-size:0.82rem;font-family:var(--mono)">No unit data available</div>'
+        : units.map(u => renderUnitRow(u, call.system_id, sysInfo)).join('')
+      }
+    </div>
+  `;
+
+  // Pre-check CSV status for each unit
+  units.forEach(u => checkUnitCSV(call.system_id, u.unit_id));
+}
+
+function renderUnitRow(unit, systemId, sysInfo) {
+  const compositeId = `${systemId}:${unit.unit_id}`;
+  const safeId = compositeId.replace(/:/g, '_');
+  const currentAlias = unit.alpha_tag || '';
+  const btnCls = sysInfo.cls === 'ipsc' ? 'ipsc' : '';
+
+  return `<div class="unit-row" id="row_${safeId}">
+    <div>
+      <div class="unit-id-line">
+        <span class="unit-id">${unit.unit_id}</span>
+        <span class="unit-current-alias" id="curAlias_${safeId}">${currentAlias ? '· ' + esc(currentAlias) : ''}</span>
+        <span class="unit-csv-badge badge ${sysInfo.cls}" style="margin-left:auto">${sysInfo.csv}</span>
+      </div>
+      <div class="alias-row">
+        <input
+          class="alias-input"
+          id="alias_${safeId}"
+          type="text"
+          placeholder="Enter alias…"
+          value="${esc(currentAlias)}"
+          onkeydown="if(event.key==='Enter') saveAlias('${compositeId}')"
+        >
+        <button
+          class="save-btn ${btnCls}"
+          id="btn_${safeId}"
+          onclick="saveAlias('${compositeId}')"
+        >SAVE</button>
+      </div>
+    </div>
+    <div class="unit-status" id="status_${safeId}"></div>
+  </div>`;
+}
+
+async function checkUnitCSV(systemId, unitId) {
+  const compositeId = `${systemId}:${unitId}`;
+  const safeId = compositeId.replace(/:/g, '_');
+  const statusEl = document.getElementById(`status_${safeId}`);
+  if (!statusEl) return;
+
+  try {
+    const r = await fetch(`/api/units/${compositeId}/check`);
+    const data = await r.json();
+    if (data.exists) {
+      statusEl.className = 'unit-status warn';
+      statusEl.textContent = `⚑ Already in ${data.csv_file} as "${data.current_alias}"`;
+      const input = document.getElementById(`alias_${safeId}`);
+      if (input && !input.value) input.value = data.current_alias || '';
+    } else {
+      statusEl.className = 'unit-status';
+      statusEl.textContent = `Not yet in ${data.csv_file}`;
+    }
+  } catch(e) { /* silent */ }
+}
+
+// ── Save Alias ────────────────────────────────────────────────────────────
+async function saveAlias(compositeId, overwrite = false) {
+  const safeId = compositeId.replace(/:/g, '_');
+  const input = document.getElementById(`alias_${safeId}`);
+  const btn = document.getElementById(`btn_${safeId}`);
+  const statusEl = document.getElementById(`status_${safeId}`);
+  const alias = (input?.value || '').trim();
+
+  if (!alias) {
+    statusEl.className = 'unit-status err';
+    statusEl.textContent = '✖ Alias cannot be empty';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '...';
+  statusEl.className = 'unit-status';
+  statusEl.textContent = '';
+
+  try {
+    const r = await fetch(`/api/units/${compositeId}/alias`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alias, overwrite }),
+    });
+    const data = await r.json();
+
+    if (r.status === 409 && data.conflict) {
+      // Show conflict modal
+      conflictPending = { compositeId, alias, safeId };
+      document.getElementById('conflictBody').innerHTML =
+        `Unit <code>${compositeId.split(':')[1]}</code> already exists in <code>${data.csv_file}</code> ` +
+        `with alias <code>${esc(data.current_alias)}</code>.<br><br>` +
+        `Overwrite with <code>${esc(alias)}</code>?`;
+      document.getElementById('conflictModal').classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'SAVE';
+      return;
+    }
+
+    if (data.success) {
+      statusEl.className = 'unit-status ok';
+      const trOk = data.tr_engine_status === 200;
+      statusEl.textContent = `✔ Saved to ${data.csv_file}${trOk ? ' + DB updated' : ' (DB update failed)'}`;
+      // Update shown alias
+      const curAlias = document.getElementById(`curAlias_${safeId}`);
+      if (curAlias) curAlias.textContent = `· ${alias}`;
+    } else {
+      statusEl.className = 'unit-status err';
+      statusEl.textContent = `✖ ${data.error || 'Unknown error'}`;
+    }
+  } catch(e) {
+    statusEl.className = 'unit-status err';
+    statusEl.textContent = '✖ Network error';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'SAVE';
+  }
+}
+
+function dismissConflict() {
+  document.getElementById('conflictModal').classList.add('hidden');
+  conflictPending = null;
+}
+
+function confirmOverwrite() {
+  document.getElementById('conflictModal').classList.add('hidden');
+  if (conflictPending) {
+    const { compositeId } = conflictPending;
+    conflictPending = null;
+    saveAlias(compositeId, true);
+  }
+}
+
+// ── Utility ───────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+loadCalls(true);
+</script>
+</body>
+</html>

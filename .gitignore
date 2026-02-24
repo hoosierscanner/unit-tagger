@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.pyo
+tagger.log
+*.log
+.env
